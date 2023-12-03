@@ -69,14 +69,16 @@ local function upload_to_cloudinary(file_path)
 end
 
 M.CloudyPaste = function()
+  -- Get the directory of the current script
+  local script_dir = debug.getinfo(1).source:match("@?(.*/)")
+  script_dir = script_dir or "./" -- Use current directory if script_dir is nil
   -- Run wl-paste to get clipboard contents (binary data)
   local handle = io.popen("wl-paste --type image/png", "r")
   if handle then
     local image_data = handle:read("*a")
     handle:close()
-
     if image_data and #image_data > 0 then
-      local file_path = "/home/e2r2fx/Documents/output.png"
+      local file_path = script_dir .. "output.png"
       local file = io.open(file_path, "wb")
       if file then
         file:write(image_data)
