@@ -38,62 +38,67 @@ local function upload_to_cloudinary(file_path)
     signature
   )
 
-  -- Execute the curl command
   local handle = io.popen(curl_command, "r")
-  if handle then
-    local response = handle:read("*a")
-    handle:close()
-
-    if response and response ~= "" then
-      -- Parse the JSON response
-      local result = vim.fn.json_decode(response)
-      if result and result.secure_url then
-        -- Copy the URL to the clipboard using wl-copy
-        local copy_handle = io.popen("wl-copy", "w")
-        if copy_handle then
-          copy_handle:write(result.secure_url)
-          copy_handle:close()
-          vim.notify("Uploaded image URL: " .. result.secure_url .. " (copied to clipboard)", vim.log.levels.INFO)
-        else
-          vim.notify("Failed to copy URL to clipboard.", vim.log.levels.ERROR)
-        end
-      else
-        vim.notify("Failed to upload image to Cloudinary.", vim.log.levels.ERROR)
-      end
-    else
-      vim.notify("Received empty response from Cloudinary.", vim.log.levels.ERROR)
-    end
-  else
+  if not handle then
     vim.notify("Failed to execute curl.", vim.log.levels.ERROR)
+    return
   end
+
+  local response = handle:read("*a")
+  handle:close()
+
+  if not response or response == "" then
+    vim.notify("Received empty response from Cloudinary.", vim.log.levels.ERROR)
+    return
+  end
+
+  local result = vim.fn.json_decode(response)
+  if not result or not result.secure_url then
+    vim.notify("Failed to upload image to Cloudinary.", vim.log.levels.ERROR)
+    return
+  end
+
+  local copy_handle = io.popen("wl-copy", "w")
+  if not copy_handle then
+    vim.notify("Failed to copy URL to clipboard.", vim.log.levels.ERROR)
+    return
+  end
+
+  copy_handle:write(result.secure_url)
+  copy_handle:close()
+  vim.notify("Uploaded image URL: " .. result.secure_url .. " (copied to clipboard)", vim.log.levels.INFO)
 end
 
 M.CloudyPaste = function()
   -- Get the directory of the current script
   local script_dir = debug.getinfo(1).source:match("@?(.*/)")
   script_dir = script_dir or "./" -- Use current directory if script_dir is nil
+
   -- Run wl-paste to get clipboard contents (binary data)
   local handle = io.popen("wl-paste --type image/png", "r")
-  if handle then
-    local image_data = handle:read("*a")
-    handle:close()
-    if image_data and #image_data > 0 then
-      local file_path = script_dir .. "output.png"
-      local file = io.open(file_path, "wb")
-      if file then
-        file:write(image_data)
-        file:close()
-        vim.notify("Image saved locally, starting upload to Cloudinary...", vim.log.levels.INFO)
-        upload_to_cloudinary(file_path)
-      else
-        vim.notify("Failed to open file for writing at " .. file_path, vim.log.levels.ERROR)
-      end
-    else
-      vim.notify("No image data found in clipboard", vim.log.levels.WARN)
-    end
-  else
+  if not handle then
     vim.notify("Failed to run wl-paste", vim.log.levels.ERROR)
+    return
   end
+
+  local image_data = handle:read("*a")
+  handle:close()
+  if not image_data or #image_data == 0 then
+    vim.notify("No image data found in clipboard", vim.log.levels.WARN)
+    return
+  end
+
+  local file_path = script_dir .. "output.png"
+  local file = io.open(file_path, "wb")
+  if not file then
+    vim.notify("Failed to open file for writing at " .. file_path, vim.log.levels.ERROR)
+    return
+  end
+
+  file:write(image_data)
+  file:close()
+  vim.notify("Image saved locally, starting upload to Cloudinary...", vim.log.levels.INFO)
+  upload_to_cloudinary(file_path)
 end
 
 return M
