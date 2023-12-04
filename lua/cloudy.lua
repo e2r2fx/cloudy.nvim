@@ -6,6 +6,15 @@ local function parse_cloudinary_url(cloudinary_url)
   return api_key, api_secret, cloud_name
 end
 
+local function get_clipboard_command(action)
+  local session_type = os.getenv("XDG_SESSION_TYPE")
+  local commands = {
+    wayland = { copy = "wl-copy", paste = "wl-paste --type image/png" },
+    x11 = { copy = "xclip -selection clipboard", paste = "xclip -selection clipboard -t image/png -o" },
+  }
+  return commands[session_type][action]
+end
+
 local function upload_to_cloudinary(file_path)
   local cloudinary_url = os.getenv("CLOUDINARY_URL")
   if not cloudinary_url then
@@ -57,8 +66,8 @@ local function upload_to_cloudinary(file_path)
     vim.notify("Failed to upload image to Cloudinary.", vim.log.levels.ERROR)
     return
   end
-
-  local copy_handle = io.popen("wl-copy", "w")
+  local copy_command = get_clipboard_command("copy")
+  local copy_handle = io.popen(copy_command, "w")
   if not copy_handle then
     vim.notify("Failed to copy URL to clipboard.", vim.log.levels.ERROR)
     return
@@ -73,11 +82,11 @@ M.CloudyPaste = function()
   -- Get the directory of the current script
   local script_dir = debug.getinfo(1).source:match("@?(.*/)")
   script_dir = script_dir or "./" -- Use current directory if script_dir is nil
-
-  -- Run wl-paste to get clipboard contents (binary data)
-  local handle = io.popen("wl-paste --type image/png", "r")
+  -- Run clipboard paste command to get clipboard contents (binary data)
+  local paste_command = get_clipboard_command("paste")
+  local handle = io.popen(paste_command .. " --type image/png", "r")
   if not handle then
-    vim.notify("Failed to run wl-paste", vim.log.levels.ERROR)
+    vim.notify("Failed to run clipboard paste command", vim.log.levels.ERROR)
     return
   end
 
