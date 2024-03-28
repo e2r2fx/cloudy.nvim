@@ -1,5 +1,18 @@
 local M = {}
 
+local config = {
+  wayland = nil,
+}
+
+function M.setup(user_config)
+  user_config = user_config or {}
+  for k, v in pairs(user_config) do
+    if config[k] ~= nil then
+      config[k] = v
+    end
+  end
+end
+
 local function parse_cloudinary_url(cloudinary_url)
   local pattern = "cloudinary://([^:]+):([^@]+)@([^/]+)"
   local api_key, api_secret, cloud_name = cloudinary_url:match(pattern)
@@ -7,7 +20,12 @@ local function parse_cloudinary_url(cloudinary_url)
 end
 
 local function get_clipboard_command(action)
-  local session_type = os.getenv("XDG_SESSION_TYPE")
+  local session_type
+  if config.wayland ~= nil then
+    session_type = config.wayland and "wayland" or "x11"
+  else
+    session_type = os.getenv("XDG_SESSION_TYPE") or "wayland"
+  end
   local commands = {
     wayland = { copy = "wl-copy", paste = "wl-paste --type image/png" },
     x11 = { copy = "xclip -selection clipboard", paste = "xclip -selection clipboard -t image/png -o" },
@@ -66,15 +84,7 @@ local function upload_to_cloudinary(file_path)
     vim.notify("Failed to upload image to Cloudinary.", vim.log.levels.ERROR)
     return
   end
-  local copy_command = get_clipboard_command("copy")
-  local copy_handle = io.popen(copy_command, "w")
-  if not copy_handle then
-    vim.notify("Failed to copy URL to clipboard.", vim.log.levels.ERROR)
-    return
-  end
-
-  copy_handle:write(result.secure_url)
-  copy_handle:close()
+  vim.fn.setreg("+", result.secure_url)
   vim.notify("Uploaded image URL: " .. result.secure_url .. " (copied to clipboard)", vim.log.levels.INFO)
 end
 
